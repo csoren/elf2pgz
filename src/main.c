@@ -5,13 +5,13 @@
 
 static Elf32_Half
 swaph(Elf32_Half h) {
-	return ((h << 8) | (h >> 8)) & 0xFFFF;
+	return ((h << 8u) | (h >> 8u)) & 0xFFFFu;
 }
 
 static Elf32_Word
 swapw(Elf32_Word h) {
-	h = (h << 16) | (h >> 16);
-	h = ((h & 0xFF00FF00) >> 8) | ((h & 0x00FF00FF) << 8);
+	h = (h << 16u) | (h >> 16u);
+	h = ((h & 0xFF00FF00u) >> 8u) | ((h & 0x00FF00FFu) << 8u);
 	return h;
 }
 
@@ -47,12 +47,6 @@ main(int argc, const char* argv[]) {
 		return 1;
 	}
 
-	FILE* outfile = fopen(out_name, "wb");
-	if (outfile == NULL) {
-		fprintf(stderr, "Unable to open file %s for writing\n", out_name);
-		return 1;
-	}
-
 	Elf32_Ehdr header;
 	// Check if this is an ELF file we like
 	if (fread(&header, sizeof(header), 1, infile) == 1) {
@@ -64,6 +58,12 @@ main(int argc, const char* argv[]) {
 		&& header.e_ident[EI_DATA] == ELFDATA2MSB
 		&& swaph(header.e_type) == ET_EXEC
 		&& swaph(header.e_machine) == EM_68K) {
+
+			FILE* outfile = fopen(out_name, "wb");
+			if (outfile == NULL) {
+				fprintf(stderr, "Unable to open file %s for writing\n", out_name);
+				return 1;
+			}
 
 			// PGZ "header"
 			fputc(PGZ_32BIT, outfile);
@@ -96,9 +96,11 @@ main(int argc, const char* argv[]) {
 			// Entry address section
 			fputll(swapw(header.e_entry), outfile);
 			fputll(0, outfile);
+
+			fclose(outfile);
 		}
 	}
 
 	fclose(infile);
-	fclose(outfile);
+	return 0;
 }
