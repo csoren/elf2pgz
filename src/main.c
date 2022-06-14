@@ -5,15 +5,15 @@
 #define PGZ_32BIT 'z'
 
 static Elf32_Half
-swaph(Elf32_Half h) {
-	return ((h << 8u) | (h >> 8u)) & 0xFFFFu;
+swaph(Elf32_Half* h) {
+	uint8_t* p = (uint8_t*) h;
+	return (p[0] << 8) | p[1];
 }
 
 static Elf32_Word
-swapw(Elf32_Word h) {
-	h = (h << 16u) | (h >> 16u);
-	h = ((h & 0xFF00FF00u) >> 8u) | ((h & 0x00FF00FFu) << 8u);
-	return h;
+swapw(Elf32_Word* w) {
+	uint8_t* p = (uint8_t*) w;
+	return (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
 }
 
 
@@ -38,24 +38,24 @@ copySections(Elf32_Ehdr* header, FILE* outfile, FILE* infile) {
 	fputc(PGZ_32BIT, outfile);
 
 	// Copy sections with data
-	Elf32_Off offset = swapw(header->e_phoff);
-	for (Elf32_Half sectionIndex = 0; sectionIndex < swaph(header->e_phnum); ++sectionIndex, offset += swaph(header->e_phentsize)) {
+	Elf32_Off offset = swapw(&header->e_phoff);
+	for (Elf32_Half sectionIndex = 0; sectionIndex < swaph(&header->e_phnum); ++sectionIndex, offset += swaph(&header->e_phentsize)) {
 		fseek(infile, offset, SEEK_SET);
 		Elf32_Phdr pheader;
 		if (fread(&pheader, sizeof(pheader), 1, infile) == 1) {
-			if (swapw(pheader.p_type) == PT_LOAD) {
+			if (swapw(&pheader.p_type) == PT_LOAD) {
 				// PGZ section information
-				fputll(swapw(pheader.p_vaddr), outfile);
-				fputll(swapw(pheader.p_memsz), outfile);
+				fputll(swapw(&pheader.p_vaddr), outfile);
+				fputll(swapw(&pheader.p_memsz), outfile);
 
 				// Copy bytes
-				fseek(infile, swapw(pheader.p_offset), SEEK_SET);
+				fseek(infile, swapw(&pheader.p_offset), SEEK_SET);
 				Elf32_Word i;
-				for (i = 0; i < swapw(pheader.p_filesz); ++i) {
+				for (i = 0; i < swapw(&pheader.p_filesz); ++i) {
 					fputc(fgetc(infile), outfile);
 				}
 				// Pad with zeroes if necessary
-				while (i++ < swapw(pheader.p_memsz)) {
+				while (i++ < swapw(&pheader.p_memsz)) {
 					fputc(0, outfile);
 				}
 			}
@@ -63,7 +63,7 @@ copySections(Elf32_Ehdr* header, FILE* outfile, FILE* infile) {
 	}
 
 	// Entry address section
-	fputll(swapw(header->e_entry), outfile);
+	fputll(swapw(&header->e_entry), outfile);
 	fputll(0, outfile);
 }
 
@@ -91,8 +91,8 @@ main(int argc, const char* argv[]) {
 			&& header.e_ident[EI_MAG3] == ELFMAG3
 			&& header.e_ident[EI_CLASS] == ELFCLASS32
 			&& header.e_ident[EI_DATA] == ELFDATA2MSB
-			&& swaph(header.e_type) == ET_EXEC
-			&& swaph(header.e_machine) == EM_68K) {
+			&& swaph(&header.e_type) == ET_EXEC
+			&& swaph(&header.e_machine) == EM_68K) {
 
 				FILE* outfile = fopen(out_name, "wb");
 				if (outfile != NULL) {
